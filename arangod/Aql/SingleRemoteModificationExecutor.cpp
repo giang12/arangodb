@@ -36,8 +36,9 @@ using namespace arangodb;
 using namespace arangodb::aql;
 
 template <typename Modifier>
-SingleRemoteModificationExecutor<Modifier>::SingleRemoteModificationExecutor(Fetcher& fetcher, Infos& info)
-    : _info(info), _fetcher(fetcher), _upstreamState(ExecutionState::HASMORE){};
+SingleRemoteModificationExecutor<Modifier>::SingleRemoteModificationExecutor(Fetcher& fetcher,
+                                                                             Infos& info, SingleRemoteModificationExecutorInfo& remoteInfo)
+    : _info(info), _remoteInfo(remoteInfo), _fetcher(fetcher), _upstreamState(ExecutionState::HASMORE){};
 
 template <typename Modifier>
 SingleRemoteModificationExecutor<Modifier>::~SingleRemoteModificationExecutor() = default;
@@ -66,9 +67,8 @@ SingleRemoteModificationExecutor<Modifier>::produceRow(OutputAqlItemRow& output)
 }
 
 template <typename Modifier>
-bool SingleRemoteModificationExecutor<Modifier>::doSingleRemoteModificationOperation(InputAqlItemRow& input,
-                                                             OutputAqlItemRow& output,
-                                                             Stats& stats) {
+bool SingleRemoteModificationExecutor<Modifier>::doSingleRemoteModificationOperation(
+    InputAqlItemRow& input, OutputAqlItemRow& output, Stats& stats) {
   const bool isIndex = std::is_same<Modifier, Index>::value;
   const bool isInsert = std::is_same<Modifier, Insert>::value;
   const bool isRemove = std::is_same<Modifier, Remove>::value;
@@ -100,7 +100,7 @@ bool SingleRemoteModificationExecutor<Modifier>::doSingleRemoteModificationOpera
 
   std::unique_ptr<VPackBuilder> mergedBuilder;
   if (!_key.empty()) {
-    //FIXME mergedBuilder = merge(inSlice, _key, 0);
+    // FIXME mergedBuilder = merge(inSlice, _key, 0);
     inSlice = mergedBuilder->slice();
   }
 
@@ -146,15 +146,16 @@ bool SingleRemoteModificationExecutor<Modifier>::doSingleRemoteModificationOpera
     }
 
     if (isIndex) {
-       return false;
+      return false;
     }
   }
 
   stats.addWritesExecuted(possibleWrites);
   // FIXME _engine->_stats.scannedIndex++;
 
-  if (!(_info._outputRegisterId.has_value() || _info._outputOldRegisterId.has_value() || _info._outputNewRegisterId.has_value())) {
-  //FIXME  return node->hasParent();
+  if (!(_info._outputRegisterId.has_value() || _info._outputOldRegisterId.has_value() ||
+        _info._outputNewRegisterId.has_value())) {
+    // FIXME  return node->hasParent();
   }
 
   // Fill itemblock
@@ -182,29 +183,29 @@ bool SingleRemoteModificationExecutor<Modifier>::doSingleRemoteModificationOpera
     }
   }
 
-  TRI_ASSERT(_info._outputRegisterId || _info._outputOldRegisterId.has_value() || _info._outputNewRegisterId.has_value());
+  TRI_ASSERT(_info._outputRegisterId || _info._outputOldRegisterId.has_value() ||
+             _info._outputNewRegisterId.has_value());
 
   // place documents as in the out variable slots of the result
   if (_info._outputRegisterId.has_value()) {
     AqlValue value(outDocument);
-    AqlValueGuard guard(value,true);
+    AqlValueGuard guard(value, true);
     output.moveValueInto(_info._outputRegisterId.value(), input, guard);
   }
 
   if (_info._outputOldRegisterId.has_value()) {
     TRI_ASSERT(options.returnOld);
     AqlValue value(oldDocument);
-    AqlValueGuard guard(value,true);
+    AqlValueGuard guard(value, true);
     output.moveValueInto(_info._outputOldRegisterId.value(), input, guard);
   }
 
   if (_info._outputNewRegisterId.has_value()) {
     TRI_ASSERT(options.returnNew);
     AqlValue value(newDocument);
-    AqlValueGuard guard(value,true);
+    AqlValueGuard guard(value, true);
     output.moveValueInto(_info._outputNewRegisterId.value(), input, guard);
   }
-
 
   TRI_IF_FAILURE("SingleRemoteModificationOperationBlock::moreDocuments") {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);

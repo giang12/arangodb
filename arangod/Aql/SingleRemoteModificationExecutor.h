@@ -30,6 +30,15 @@ namespace aql {
 
 struct Index {};
 
+struct SingleRemoteModificationExecutorInfo {
+  SingleRemoteModificationExecutorInfo(std::string& key)
+  : _key(key){}
+
+  std::string& _key;
+
+};
+
+
 template <typename Modifier>
 struct SingleRemoteModificationExecutor {
   struct Properties {
@@ -41,7 +50,7 @@ struct SingleRemoteModificationExecutor {
   using Stats = ModificationStats;
   using Modification = Modifier;
 
-  SingleRemoteModificationExecutor(Fetcher&, Infos&);
+  SingleRemoteModificationExecutor(Fetcher&, Infos&, SingleRemoteModificationExecutorInfo&);
   ~SingleRemoteModificationExecutor();
 
   /**
@@ -56,6 +65,7 @@ struct SingleRemoteModificationExecutor {
   bool doSingleRemoteModificationOperation(InputAqlItemRow&, OutputAqlItemRow&, Stats&);
 
   ModificationExecutorInfos& _info;
+  SingleRemoteModificationExecutorInfo& _remoteInfo;
   Fetcher& _fetcher;
   ExecutionState _upstreamState;
   std::string _key;

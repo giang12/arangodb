@@ -89,7 +89,7 @@ class ExecutionEngine;
  *         as many rows from above as it likes. It can only follow the
  *         xxxFetcher interface to get AqlItemRows from Upstream.
  */
-template <class Executor>
+template <class Executor, typename... InfoArgs>
 class ExecutionBlockImpl : public ExecutionBlock {
   using Fetcher = typename Executor::Fetcher;
   using ExecutorStats = typename Executor::Stats;
@@ -111,8 +111,7 @@ class ExecutionBlockImpl : public ExecutionBlock {
    *               required for the execution.
    * @param node The Node used to create this ExecutionBlock
    */
-  ExecutionBlockImpl(ExecutionEngine* engine, ExecutionNode const* node,
-                     typename Executor::Infos&&);
+  ExecutionBlockImpl(ExecutionEngine* engine, ExecutionNode const* node, InfoArgs&&...);
 
   ~ExecutionBlockImpl();
 
@@ -228,6 +227,26 @@ class ExecutionBlockImpl : public ExecutionBlock {
   Executor& executor() { return _executor; }
 
  private:
+  //_executor(_rowFetcher,  std::get<0>(_args)),
+  constexpr static std::size_t sequenceSize = sizeof...(InfoArgs);
+  using sequence = std::make_index_sequence<sequenceSize>;
+  std::tuple<InfoArgs...> _args;
+
+  template <std::size_t... seq>
+  static Executor createExecutor(Fetcher& fetcher, std::tuple<InfoArgs...>& args,
+                                 std::index_sequence<seq...>) {
+    return Executor(fetcher, std::get<seq>(args)...);
+  }
+
+  template <std::size_t... seq>
+  static Executor placeExecutor(Executor& executor, Fetcher& fetcher,
+                                std::tuple<InfoArgs...>& args,
+                                std::index_sequence<seq...>) {
+    new (&executor) Executor(fetcher, std::get<seq>(args)...);
+  }
+
+  Infos& _infos;
+
   /**
    * @brief Used to allow the row Fetcher to access selected methods of this
    *        ExecutionBlock object.
@@ -245,7 +264,6 @@ class ExecutionBlockImpl : public ExecutionBlock {
    *        the template class needs to implement the logic
    *        to produce a single row from the upstream information.
    */
-  Infos _infos;
   Executor _executor;
 
   std::unique_ptr<OutputAqlItemRow> _outputItemRow;

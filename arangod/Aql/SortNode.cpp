@@ -241,9 +241,9 @@ std::unique_ptr<ExecutionBlock> SortNode::createBlock(
                           getRegisterPlan()->nrRegs[getDepth()], getRegsToClear(),
                           calcRegsToKeep(), engine.getQuery()->trx(), _stable);
   if (sorterType() == SorterType::Standard){
-    return std::make_unique<ExecutionBlockImpl<SortExecutor>>(&engine, this, std::move(infos));
+    return std::make_unique<ExecutionBlockImpl<SortExecutor, SortExecutorInfos>>(&engine, this, std::move(infos));
   } else {
-    return std::make_unique<ExecutionBlockImpl<ConstrainedSortExecutor>>(&engine, this, std::move(infos));
+    return std::make_unique<ExecutionBlockImpl<ConstrainedSortExecutor, SortExecutorInfos>>(&engine, this, std::move(infos));
   }
 }
 

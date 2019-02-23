@@ -141,7 +141,7 @@ std::unique_ptr<ExecutionBlock> CollectNode::createBlock(
                                       getRegisterPlan()->nrRegs[getDepth()],
                                       getRegsToClear(), calcRegsToKeep());
 
-      return std::make_unique<ExecutionBlockImpl<CountCollectExecutor>>(&engine, this,
+      return std::make_unique<ExecutionBlockImpl<CountCollectExecutor, CountCollectExecutorInfos>>(&engine, this,
                                                                         std::move(infos));
     }
     case CollectOptions::CollectMethod::DISTINCT: {
@@ -178,7 +178,7 @@ std::unique_ptr<ExecutionBlock> CollectNode::createBlock(
                                          std::move(writeableInputRegisters),
                                          std::move(groupRegisters), trxPtr);
 
-      return std::make_unique<ExecutionBlockImpl<DistinctCollectExecutor>>(&engine, this,
+      return std::make_unique<ExecutionBlockImpl<DistinctCollectExecutor, DistinctCollectExecutorInfos>>(&engine, this,
                                                                            std::move(infos));
     }
     default:

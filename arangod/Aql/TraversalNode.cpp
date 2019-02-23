@@ -465,7 +465,7 @@ std::unique_ptr<ExecutionBlock> TraversalNode::createBlock(
                                outputRegisterMapping, getStartVertex(),
                                inputRegister, std::move(filterConditionVariables));
 
-  return std::make_unique<ExecutionBlockImpl<TraversalExecutor>>(&engine, this,
+  return std::make_unique<ExecutionBlockImpl<TraversalExecutor, TraversalExecutorInfos>>(&engine, this,
                                                                  std::move(infos));
 }
 

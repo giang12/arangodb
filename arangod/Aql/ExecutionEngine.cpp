@@ -575,12 +575,12 @@ ExecutionEngine* ExecutionEngine::instantiateFromPlan(QueryRegistry* queryRegist
 
       bool const returnInheritedResults = !isDBServer;
       if (returnInheritedResults) {
-        auto returnNode = dynamic_cast<ExecutionBlockImpl<ReturnExecutor<true>>*>(root);
+        auto returnNode = dynamic_cast<ExecutionBlockImpl<ReturnExecutor<true>, ReturnExecutorInfos>*>(root);
         TRI_ASSERT(returnNode != nullptr);
         engine->resultRegister(returnNode->infos().getInputRegisterId());
         TRI_ASSERT(returnNode->infos().returnInheritedResults() == returnInheritedResults);
       } else {
-        auto returnNode = dynamic_cast<ExecutionBlockImpl<ReturnExecutor<false>>*>(root);
+        auto returnNode = dynamic_cast<ExecutionBlockImpl<ReturnExecutor<false>, ReturnExecutorInfos>*>(root);
         TRI_ASSERT(returnNode != nullptr);
         TRI_ASSERT(returnNode->infos().returnInheritedResults() == returnInheritedResults);
       }

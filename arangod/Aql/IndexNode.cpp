@@ -391,7 +391,7 @@ std::unique_ptr<ExecutionBlock> IndexNode::createBlock(
                            std::move(inRegs), hasV8Expression, _condition->root(),
                            this->getIndexes(), _plan->getAst(), this->options());
 
-  return std::make_unique<ExecutionBlockImpl<IndexExecutor>>(&engine, this,
+  return std::make_unique<ExecutionBlockImpl<IndexExecutor,IndexExecutorInfos>>(&engine, this,
                                                              std::move(infos));
 }
 

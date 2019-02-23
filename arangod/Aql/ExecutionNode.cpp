@@ -1259,7 +1259,7 @@ std::unique_ptr<ExecutionBlock> SingletonNode::createBlock(
   }
 
   IdExecutorInfos infos(nrRegs, std::move(toKeep), getRegsToClear());
-  return std::make_unique<ExecutionBlockImpl<IdExecutor>>(&engine, this, std::move(infos));
+  return std::make_unique<ExecutionBlockImpl<IdExecutor, IdExecutor::Infos>>(&engine, this, std::move(infos));
 }
 
 /// @brief toVelocyPack, for SingletonNode
@@ -1317,7 +1317,7 @@ std::unique_ptr<ExecutionBlock> EnumerateCollectionNode::createBlock(
       &engine, this->_collection, _outVariable, this->isVarUsedLater(_outVariable),
       this->projections(), trxPtr, this->coveringIndexAttributePositions(),
       EngineSelectorFeature::ENGINE->useRawDocumentPointers(), this->_random);
-  return std::make_unique<ExecutionBlockImpl<EnumerateCollectionExecutor>>(&engine, this,
+  return std::make_unique<ExecutionBlockImpl<EnumerateCollectionExecutor, EnumerateCollectionExecutor::Infos>>(&engine, this,
                                                                            std::move(infos));
 }
 
@@ -1388,7 +1388,7 @@ std::unique_ptr<ExecutionBlock> EnumerateListNode::createBlock(
                                    getRegisterPlan()->nrRegs[previousNode->getDepth()],
                                    getRegisterPlan()->nrRegs[getDepth()],
                                    getRegsToClear(), calcRegsToKeep());
-  return std::make_unique<ExecutionBlockImpl<EnumerateListExecutor>>(&engine, this,
+  return std::make_unique<ExecutionBlockImpl<EnumerateListExecutor, EnumerateListExecutor::Infos>>(&engine, this,
                                                                      std::move(infos));
 }
 
@@ -1478,7 +1478,7 @@ std::unique_ptr<ExecutionBlock> LimitNode::createBlock(
                            getRegisterPlan()->nrRegs[getDepth()], getRegsToClear(),
                            calcRegsToKeep(), _offset, _limit, _fullCount);
 
-  return std::make_unique<ExecutionBlockImpl<LimitExecutor>>(&engine, this,
+  return std::make_unique<ExecutionBlockImpl<LimitExecutor, LimitExecutor::Infos>>(&engine, this,
                                                              std::move(infos));
 }
 
@@ -1615,13 +1615,13 @@ std::unique_ptr<ExecutionBlock> CalculationNode::createBlock(
   );
 
   if (isReference) {
-    return std::make_unique<ExecutionBlockImpl<CalculationExecutor<CalculationType::Reference>>>(
+    return std::make_unique<ExecutionBlockImpl<CalculationExecutor<CalculationType::Reference>, CalculationExecutorInfos>>(
         &engine, this, std::move(infos));
   } else if (!willUseV8) {
-    return std::make_unique<ExecutionBlockImpl<CalculationExecutor<CalculationType::Condition>>>(
+    return std::make_unique<ExecutionBlockImpl<CalculationExecutor<CalculationType::Condition>, CalculationExecutorInfos>>(
         &engine, this, std::move(infos));
   } else {
-    return std::make_unique<ExecutionBlockImpl<CalculationExecutor<CalculationType::V8Condition>>>(
+    return std::make_unique<ExecutionBlockImpl<CalculationExecutor<CalculationType::V8Condition>, CalculationExecutorInfos>>(
         &engine, this, std::move(infos));
   }
 }
@@ -1916,7 +1916,7 @@ std::unique_ptr<ExecutionBlock> FilterNode::createBlock(
                             getRegisterPlan()->nrRegs[previousNode->getDepth()],
                             getRegisterPlan()->nrRegs[getDepth()],
                             getRegsToClear(), calcRegsToKeep());
-  return std::make_unique<ExecutionBlockImpl<FilterExecutor>>(&engine, this,
+  return std::make_unique<ExecutionBlockImpl<FilterExecutor, FilterExecutor::Infos>>(&engine, this,
                                                               std::move(infos));
 }
 
@@ -2000,10 +2000,10 @@ std::unique_ptr<ExecutionBlock> ReturnNode::createBlock(
                             getRegisterPlan()->nrRegs[getDepth()], _count,
                             returnInheritedResults);
   if (returnInheritedResults) {
-    return std::make_unique<ExecutionBlockImpl<ReturnExecutor<true>>>(&engine, this,
+    return std::make_unique<ExecutionBlockImpl<ReturnExecutor<true>, ReturnExecutor<true>::Infos>>(&engine, this,
                                                                       std::move(infos));
   } else {
-    return std::make_unique<ExecutionBlockImpl<ReturnExecutor<false>>>(&engine, this,
+    return std::make_unique<ExecutionBlockImpl<ReturnExecutor<false>, ReturnExecutor<false>::Infos>>(&engine, this,
                                                                        std::move(infos));
   }
 }
@@ -2053,7 +2053,7 @@ std::unique_ptr<ExecutionBlock> NoResultsNode::createBlock(
                       getRegisterPlan()->nrRegs[previousNode->getDepth()],
                       getRegisterPlan()->nrRegs[getDepth()], getRegsToClear(),
                       calcRegsToKeep());
-  return std::make_unique<ExecutionBlockImpl<NoResultsExecutor>>(&engine, this,
+  return std::make_unique<ExecutionBlockImpl<NoResultsExecutor, NoResultsExecutor::Infos>>(&engine, this,
                                                                  std::move(infos));
 }
 

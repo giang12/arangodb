@@ -918,7 +918,7 @@ std::unique_ptr<aql::ExecutionBlock> IResearchViewNode::createBlock(
                              getRegisterPlan()->nrRegs[getDepth()],
                              getRegsToClear(), calcRegsToKeep());
 
-    return std::make_unique<aql::ExecutionBlockImpl<aql::NoResultsExecutor>>(&engine, this,
+    return std::make_unique<aql::ExecutionBlockImpl<aql::NoResultsExecutor, aql::NoResultsExecutor::Infos>>(&engine, this,
                                                                              std::move(infos));
   }
 
@@ -973,7 +973,7 @@ std::unique_ptr<aql::ExecutionBlock> IResearchViewNode::createBlock(
                              getRegisterPlan()->nrRegs[getDepth()],
                              getRegsToClear(), calcRegsToKeep());
 
-    return std::make_unique<aql::ExecutionBlockImpl<aql::NoResultsExecutor>>(&engine, this,
+    return std::make_unique<aql::ExecutionBlockImpl<aql::NoResultsExecutor, aql::NoResultsExecutor::Infos>>(&engine, this,
                                                                              std::move(infos));
   }
 

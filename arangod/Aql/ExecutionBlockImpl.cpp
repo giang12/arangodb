@@ -38,16 +38,17 @@
 #include "Aql/CountCollectExecutor.h"
 #include "Aql/DistinctCollectExecutor.h"
 #include "Aql/EnumerateCollectionExecutor.h"
-#include "Aql/ModificationExecutor.h"
-#include "Aql/ModificationExecutorTraits.h"
 #include "Aql/EnumerateListExecutor.h"
 #include "Aql/FilterExecutor.h"
 #include "Aql/IdExecutor.h"
 #include "Aql/IndexExecutor.h"
 #include "Aql/LimitExecutor.h"
+#include "Aql/ModificationExecutor.h"
+#include "Aql/ModificationExecutorTraits.h"
 #include "Aql/NoResultsExecutor.h"
 #include "Aql/ReturnExecutor.h"
 #include "Aql/ShortestPathExecutor.h"
+#include "Aql/SingleRemoteModificationExecutor.h"
 #include "Aql/SortExecutor.h"
 #include "Aql/SortRegister.h"
 #include "Aql/TraversalExecutor.h"
@@ -57,21 +58,23 @@
 using namespace arangodb;
 using namespace arangodb::aql;
 
-template <class Executor>
-ExecutionBlockImpl<Executor>::ExecutionBlockImpl(ExecutionEngine* engine,
-                                                 ExecutionNode const* node,
-                                                 typename Executor::Infos&& infos)
+template <class Executor, typename... InfoArgs>
+ExecutionBlockImpl<Executor, InfoArgs...>::ExecutionBlockImpl(ExecutionEngine* engine,
+                                                              ExecutionNode const* node,
+                                                              InfoArgs&&... args)
     : ExecutionBlock(engine, node),
+      _args(std::move(args)...),
+      _infos(std::get<0>(_args)),
       _blockFetcher(_dependencies, _engine->itemBlockManager(),
-                    infos.getInputRegisters(), infos.numberOfInputRegisters()),
+                    std::get<0>(_args).getInputRegisters(),
+                    std::get<0>(_args).numberOfInputRegisters()),
       _rowFetcher(_blockFetcher),
-      _infos(std::move(infos)),
-      _executor(_rowFetcher, _infos),
+      _executor(ExecutionBlockImpl<Executor, InfoArgs...>::createExecutor(_rowFetcher, _args, sequence{})),
       _outputItemRow(nullptr),
       _query(*engine->getQuery()) {}
 
-template <class Executor>
-ExecutionBlockImpl<Executor>::~ExecutionBlockImpl() {
+template <class Executor, typename... InfoArgs>
+ExecutionBlockImpl<Executor, InfoArgs...>::~ExecutionBlockImpl() {
   if (_outputItemRow) {
     std::unique_ptr<AqlItemBlock> block = _outputItemRow->stealBlock();
     if (block != nullptr) {
@@ -80,16 +83,19 @@ ExecutionBlockImpl<Executor>::~ExecutionBlockImpl() {
   }
 }
 
-template <class Executor>
-std::pair<ExecutionState, std::unique_ptr<AqlItemBlock>> ExecutionBlockImpl<Executor>::getSome(size_t atMost) {
+template <class Executor, typename... InfoArgs>
+auto ExecutionBlockImpl<Executor, InfoArgs...>::getSome(size_t atMost)
+    -> std::pair<ExecutionState, std::unique_ptr<AqlItemBlock>> {
   traceGetSomeBegin(atMost);
   auto result = getSomeWithoutTrace(atMost);
   return traceGetSomeEnd(result.first, std::move(result.second));
 }
 
-template <class Executor>
-std::pair<ExecutionState, std::unique_ptr<AqlItemBlock>>
-ExecutionBlockImpl<Executor>::getSomeWithoutTrace(size_t atMost) {
+template <class Executor, typename... InfoArgs>
+auto ExecutionBlockImpl<Executor, InfoArgs...>::getSomeWithoutTrace(size_t atMost)
+    -> std::pair<ExecutionState, std::unique_ptr<AqlItemBlock>>
+
+{
   // silence tests -- we need to introduce new failure tests for fetchers
   TRI_IF_FAILURE("ExecutionBlock::getOrSkipSome1") {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
@@ -174,9 +180,9 @@ ExecutionBlockImpl<Executor>::getSomeWithoutTrace(size_t atMost) {
   return {state, std::move(outputBlock)};
 }
 
-template <class Executor>
-std::unique_ptr<OutputAqlItemRow> ExecutionBlockImpl<Executor>::createOutputRow(
-    std::shared_ptr<AqlItemBlockShell>& newBlock) const {
+template <class Executor, typename... InfoArgs>
+auto ExecutionBlockImpl<Executor, InfoArgs...>::createOutputRow(std::shared_ptr<AqlItemBlockShell>& newBlock) const
+    -> std::unique_ptr<OutputAqlItemRow> {
   if /* constexpr */ (Executor::Properties::allowsBlockPassthrough) {
     return std::make_unique<OutputAqlItemRow>(newBlock, infos().getOutputRegisters(),
                                               infos().registersToKeep(),
@@ -189,8 +195,9 @@ std::unique_ptr<OutputAqlItemRow> ExecutionBlockImpl<Executor>::createOutputRow(
   }
 }
 
-template <class Executor>
-std::pair<ExecutionState, size_t> ExecutionBlockImpl<Executor>::skipSome(size_t atMost) {
+template <class Executor, typename... InfoArgs>
+auto ExecutionBlockImpl<Executor, InfoArgs...>::skipSome(size_t atMost)
+    -> std::pair<ExecutionState, size_t> {
   // TODO IMPLEMENT ME, this is a stub!
 
   traceSkipSomeBegin(atMost);
@@ -208,23 +215,24 @@ std::pair<ExecutionState, size_t> ExecutionBlockImpl<Executor>::skipSome(size_t 
   return traceSkipSomeEnd(res.first, skipped);
 }
 
-template <class Executor>
-std::pair<ExecutionState, std::unique_ptr<AqlItemBlock>> ExecutionBlockImpl<Executor>::traceGetSomeEnd(
-    ExecutionState state, std::unique_ptr<AqlItemBlock> result) {
+template <class Executor, typename... InfoArgs>
+auto ExecutionBlockImpl<Executor, InfoArgs...>::traceGetSomeEnd(ExecutionState state,
+                                                                std::unique_ptr<AqlItemBlock> result)
+    -> std::pair<ExecutionState, std::unique_ptr<AqlItemBlock>> {
   ExecutionBlock::traceGetSomeEnd(result.get(), state);
   return {state, std::move(result)};
 }
 
-template <class Executor>
-std::pair<ExecutionState, size_t> ExecutionBlockImpl<Executor>::traceSkipSomeEnd(
-    ExecutionState state, size_t skipped) {
+template <class Executor, typename... InfoArgs>
+auto ExecutionBlockImpl<Executor, InfoArgs...>::traceSkipSomeEnd(ExecutionState state, size_t skipped)
+    -> std::pair<ExecutionState, size_t> {
   ExecutionBlock::traceSkipSomeEnd(skipped, state);
   return {state, skipped};
 }
 
-template <class Executor>
-std::pair<ExecutionState, Result> ExecutionBlockImpl<Executor>::initializeCursor(
-    AqlItemBlock* items, size_t pos) {
+template <class Executor, typename... InfoArgs>
+auto ExecutionBlockImpl<Executor, InfoArgs...>::initializeCursor(AqlItemBlock* items, size_t pos)
+    -> std::pair<ExecutionState, Result> {
   // destroy and re-create the BlockFetcher
   _blockFetcher.~BlockFetcher();
   new (&_blockFetcher)
@@ -237,7 +245,7 @@ std::pair<ExecutionState, Result> ExecutionBlockImpl<Executor>::initializeCursor
 
   // destroy and re-create the Executor
   _executor.~Executor();
-  new (&_executor) Executor(_rowFetcher, _infos);
+  ExecutionBlockImpl<Executor, InfoArgs...>::placeExecutor(_executor, _rowFetcher, _args, sequence{});
   // // use this with c++17 instead of specialisation below
   // if constexpr (std::is_same_v<Executor, IdExecutor>) {
   //   if (items != nullptr) {
@@ -249,8 +257,9 @@ std::pair<ExecutionState, Result> ExecutionBlockImpl<Executor>::initializeCursor
   return ExecutionBlock::initializeCursor(items, pos);
 }
 
-template <class Executor>
-std::pair<ExecutionState, Result> ExecutionBlockImpl<Executor>::shutdown(int errorCode) {
+template <class Executor, typename... InfoArgs>
+auto ExecutionBlockImpl<Executor, InfoArgs...>::shutdown(int errorCode)
+    -> std::pair<ExecutionState, Result> {
   return ExecutionBlock::shutdown(errorCode);
 }
 
@@ -261,7 +270,7 @@ namespace arangodb {
 namespace aql {
 // TODO -- remove this specialization when cpp 17 becomes available
 template <>
-std::pair<ExecutionState, Result> ExecutionBlockImpl<IdExecutor>::initializeCursor(
+std::pair<ExecutionState, Result> ExecutionBlockImpl<IdExecutor, IdExecutor::Infos>::initializeCursor(
     AqlItemBlock* items, size_t pos) {
   // destroy and re-create the BlockFetcher
   _blockFetcher.~BlockFetcher();
@@ -293,7 +302,8 @@ std::pair<ExecutionState, Result> ExecutionBlockImpl<IdExecutor>::initializeCurs
 }
 
 template <>
-std::pair<ExecutionState, Result> ExecutionBlockImpl<TraversalExecutor>::shutdown(int errorCode) {
+std::pair<ExecutionState, Result>
+ExecutionBlockImpl<TraversalExecutor, TraversalExecutor::Infos>::shutdown(int errorCode) {
   ExecutionState state;
   Result result;
 
@@ -305,7 +315,8 @@ std::pair<ExecutionState, Result> ExecutionBlockImpl<TraversalExecutor>::shutdow
 }
 
 template <>
-std::pair<ExecutionState, Result> ExecutionBlockImpl<ShortestPathExecutor>::shutdown(int errorCode) {
+std::pair<ExecutionState, Result>
+ExecutionBlockImpl<ShortestPathExecutor, ShortestPathExecutor::Infos>::shutdown(int errorCode) {
   ExecutionState state;
   Result result;
 
@@ -319,9 +330,9 @@ std::pair<ExecutionState, Result> ExecutionBlockImpl<ShortestPathExecutor>::shut
 }  // namespace aql
 }  // namespace arangodb
 
-template <class Executor>
-std::pair<ExecutionState, std::shared_ptr<AqlItemBlockShell>>
-ExecutionBlockImpl<Executor>::requestWrappedBlock(size_t nrItems, RegisterId nrRegs) {
+template <class Executor, typename ...InfoArgs>
+auto ExecutionBlockImpl<Executor, InfoArgs...>::requestWrappedBlock(size_t nrItems, RegisterId nrRegs)
+    -> std::pair<ExecutionState, std::shared_ptr<AqlItemBlockShell>> {
   std::shared_ptr<AqlItemBlockShell> blockShell;
   if /* constexpr */ (Executor::Properties::allowsBlockPassthrough) {
     // If blocks can be passed through, we do not create new blocks.
@@ -390,26 +401,30 @@ ExecutionBlockImpl<Executor>::requestWrappedBlock(size_t nrItems, RegisterId nrR
   return {ExecutionState::HASMORE, std::move(blockShell)};
 }
 
-template class ::arangodb::aql::ExecutionBlockImpl<CalculationExecutor<CalculationType::Condition>>;
-template class ::arangodb::aql::ExecutionBlockImpl<CalculationExecutor<CalculationType::Reference>>;
-template class ::arangodb::aql::ExecutionBlockImpl<CalculationExecutor<CalculationType::V8Condition>>;
-template class ::arangodb::aql::ExecutionBlockImpl<ConstrainedSortExecutor>;
-template class ::arangodb::aql::ExecutionBlockImpl<CountCollectExecutor>;
-template class ::arangodb::aql::ExecutionBlockImpl<DistinctCollectExecutor>;
-template class ::arangodb::aql::ExecutionBlockImpl<EnumerateCollectionExecutor>;
-template class ::arangodb::aql::ExecutionBlockImpl<EnumerateListExecutor>;
-template class ::arangodb::aql::ExecutionBlockImpl<FilterExecutor>;
-template class ::arangodb::aql::ExecutionBlockImpl<IdExecutor>;
-template class ::arangodb::aql::ExecutionBlockImpl<IndexExecutor>;
-template class ::arangodb::aql::ExecutionBlockImpl<LimitExecutor>;
-template class ::arangodb::aql::ExecutionBlockImpl<ModificationExecutor<Insert>>;
-template class ::arangodb::aql::ExecutionBlockImpl<ModificationExecutor<Remove>>;
-template class ::arangodb::aql::ExecutionBlockImpl<ModificationExecutor<Replace>>;
-template class ::arangodb::aql::ExecutionBlockImpl<ModificationExecutor<Update>>;
-template class ::arangodb::aql::ExecutionBlockImpl<ModificationExecutor<Upsert>>;
-template class ::arangodb::aql::ExecutionBlockImpl<NoResultsExecutor>;
-template class ::arangodb::aql::ExecutionBlockImpl<ReturnExecutor<false>>;
-template class ::arangodb::aql::ExecutionBlockImpl<ReturnExecutor<true>>;
-template class ::arangodb::aql::ExecutionBlockImpl<ShortestPathExecutor>;
-template class ::arangodb::aql::ExecutionBlockImpl<SortExecutor>;
-template class ::arangodb::aql::ExecutionBlockImpl<TraversalExecutor>;
+template class ::arangodb::aql::ExecutionBlockImpl<CalculationExecutor<CalculationType::Condition>, CalculationExecutorInfos>;
+// template class ::arangodb::aql::ExecutionBlockImpl<CalculationExecutor<CalculationType::Reference>>;
+// template class ::arangodb::aql::ExecutionBlockImpl<CalculationExecutor<CalculationType::V8Condition>>;
+// template class ::arangodb::aql::ExecutionBlockImpl<ConstrainedSortExecutor>;
+// template class ::arangodb::aql::ExecutionBlockImpl<CountCollectExecutor>;
+// template class ::arangodb::aql::ExecutionBlockImpl<DistinctCollectExecutor>;
+// template class ::arangodb::aql::ExecutionBlockImpl<EnumerateCollectionExecutor>;
+// template class ::arangodb::aql::ExecutionBlockImpl<EnumerateListExecutor>;
+// template class ::arangodb::aql::ExecutionBlockImpl<FilterExecutor>;
+// template class ::arangodb::aql::ExecutionBlockImpl<IdExecutor>;
+// template class ::arangodb::aql::ExecutionBlockImpl<IndexExecutor>;
+// template class ::arangodb::aql::ExecutionBlockImpl<LimitExecutor>;
+// template class ::arangodb::aql::ExecutionBlockImpl<ModificationExecutor<Insert>>;
+// template class ::arangodb::aql::ExecutionBlockImpl<ModificationExecutor<Remove>>;
+// template class ::arangodb::aql::ExecutionBlockImpl<ModificationExecutor<Replace>>;
+// template class ::arangodb::aql::ExecutionBlockImpl<ModificationExecutor<Update>>;
+// template class ::arangodb::aql::ExecutionBlockImpl<ModificationExecutor<Upsert>>;
+// template class ::arangodb::aql::ExecutionBlockImpl<NoResultsExecutor>;
+// template class ::arangodb::aql::ExecutionBlockImpl<ReturnExecutor<false>>;
+// template class ::arangodb::aql::ExecutionBlockImpl<ReturnExecutor<true>>;
+// template class ::arangodb::aql::ExecutionBlockImpl<ShortestPathExecutor>;
+template class ::arangodb::aql::ExecutionBlockImpl<SingleRemoteModificationExecutor<Insert>, ModificationExecutorInfos, SingleRemoteModificationExecutorInfo>;
+// template class ::arangodb::aql::ExecutionBlockImpl<SingleRemoteModificationExecutor<Remove>>;
+// template class ::arangodb::aql::ExecutionBlockImpl<SingleRemoteModificationExecutor<Replace>>;
+// template class ::arangodb::aql::ExecutionBlockImpl<SingleRemoteModificationExecutor<Update>>;
+// template class ::arangodb::aql::ExecutionBlockImpl<SortExecutor>;
+// template class ::arangodb::aql::ExecutionBlockImpl<TraversalExecutor>;

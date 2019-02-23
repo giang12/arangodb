@@ -139,7 +139,7 @@ std::unique_ptr<ExecutionBlock> RemoveNode::createBlock(
       _options.ignoreErrors, countStats(), false /*return interhited FIXME*/,
       false /*is replace (needed by upsert)*/, _options.ignoreDocumentNotFound);
 
-  return std::make_unique<ExecutionBlockImpl<ModificationExecutor<Update>>>(&engine, this,
+  return std::make_unique<ExecutionBlockImpl<ModificationExecutor<Update>, ModificationExecutorInfos>>(&engine, this,
                                                                             std::move(infos));
 }
 
@@ -210,7 +210,7 @@ std::unique_ptr<ExecutionBlock> InsertNode::createBlock(
       _options.ignoreErrors, countStats(), false /*return interhited FIXME*/,
       false /*is replace (needed by upsert)*/, _options.ignoreDocumentNotFound);
 
-  return std::make_unique<ExecutionBlockImpl<ModificationExecutor<Insert>>>(&engine, this,
+  return std::make_unique<ExecutionBlockImpl<ModificationExecutor<Insert>, ModificationExecutorInfos>>(&engine, this,
                                                                             std::move(infos));
 }
 
@@ -306,7 +306,7 @@ std::unique_ptr<ExecutionBlock> UpdateNode::createBlock(
       _options.ignoreErrors, countStats(), false /*return interhited FIXME*/,
       false /*is replace (needed by upsert)*/, _options.ignoreDocumentNotFound);
 
-  return std::make_unique<ExecutionBlockImpl<ModificationExecutor<Update>>>(&engine, this,
+  return std::make_unique<ExecutionBlockImpl<ModificationExecutor<Update>, ModificationExecutorInfos>>(&engine, this,
                                                                             std::move(infos));
 }
 
@@ -384,7 +384,7 @@ std::unique_ptr<ExecutionBlock> ReplaceNode::createBlock(
       _options.ignoreErrors, countStats(), false /*return interhited FIXME*/,
       false /*is replace (needed by upsert)*/, _options.ignoreDocumentNotFound);
 
-  return std::make_unique<ExecutionBlockImpl<ModificationExecutor<Replace>>>(&engine, this,
+  return std::make_unique<ExecutionBlockImpl<ModificationExecutor<Replace>, ModificationExecutorInfos>>(&engine, this,
                                                                              std::move(infos));
 }
 
@@ -478,7 +478,7 @@ std::unique_ptr<ExecutionBlock> UpsertNode::createBlock(
       _options.ignoreErrors, countStats(), false /*return interhited FIXME*/,
       _isReplace, _options.ignoreDocumentNotFound);
 
-  return std::make_unique<ExecutionBlockImpl<ModificationExecutor<Insert>>>(&engine, this,
+  return std::make_unique<ExecutionBlockImpl<ModificationExecutor<Insert>, ModificationExecutorInfos>>(&engine, this,
                                                                             std::move(infos));
 }
 

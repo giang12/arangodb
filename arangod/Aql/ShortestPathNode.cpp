@@ -286,7 +286,7 @@ std::unique_ptr<ExecutionBlock> ShortestPathNode::createBlock(
                                   getRegsToClear(), calcRegsToKeep(),
                                   std::move(finder), std::move(outputRegisterMapping),
                                   std::move(sourceInput), std::move(targetInput));
-  return std::make_unique<ExecutionBlockImpl<ShortestPathExecutor>>(
+  return std::make_unique<ExecutionBlockImpl<ShortestPathExecutor , ShortestPathExecutorInfos>>(
       &engine, this, std::move(infos));
 }
 
