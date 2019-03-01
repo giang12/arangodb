@@ -128,11 +128,19 @@ void ShortestPathOptions::setEnd(std::string const& id) {
   endBuilder.add(VPackValue(id));
 }
 
+void ShortestPathOptions::setMaxPaths(size_t const& k) {
+  maxPaths = k;
+}
+
 VPackSlice ShortestPathOptions::getStart() const {
   return startBuilder.slice();
 }
 
 VPackSlice ShortestPathOptions::getEnd() const { return endBuilder.slice(); }
+
+size_t ShortestPathOptions::getMaxPaths() const {
+  return maxPaths;
+}
 
 bool ShortestPathOptions::useWeight() const { return !weightAttribute.empty(); }
 
