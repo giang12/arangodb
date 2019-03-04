@@ -52,6 +52,11 @@ ConstantWeightShortestPathFinder::~ConstantWeightShortestPathFinder() {
   clearVisited();
 }
 
+//
+// s -- start vertex
+// e -- goal vertex
+// result -- returned path
+// callback -- ?
 bool ConstantWeightShortestPathFinder::shortestPath(
     arangodb::velocypack::Slice const& s, arangodb::velocypack::Slice const& e,
     arangodb::graph::ShortestPathResult& result, std::function<void()> const& callback) {
@@ -79,18 +84,18 @@ bool ConstantWeightShortestPathFinder::shortestPath(
     THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
   }
 
-  arangodb::velocypack::StringRef n;
+  std::deque<arangodb::velocypack::StringRef> nodes;
   while (!_leftClosure.empty() && !_rightClosure.empty()) {
     callback();
 
     if (_leftClosure.size() < _rightClosure.size()) {
-      if (expandClosure(_leftClosure, _leftFound, _rightFound, false, n)) {
-        fillResult(n, result);
+      if (expandClosure(_leftClosure, _leftFound, _rightFound, false, nodes)) {
+        fillResult(nodes.front(), result);
         return true;
       }
     } else {
-      if (expandClosure(_rightClosure, _rightFound, _leftFound, true, n)) {
-        fillResult(n, result);
+      if (expandClosure(_rightClosure, _rightFound, _leftFound, true, nodes)) {
+        fillResult(nodes.front(), result);
         return true;
       }
     }
@@ -98,10 +103,11 @@ bool ConstantWeightShortestPathFinder::shortestPath(
   return false;
 }
 
-bool ConstantWeightShortestPathFinder::expandClosure(Closure& sourceClosure,
-                                                     Snippets& sourceSnippets,
-                                                     Snippets& targetSnippets,
-                                                     bool isBackward, arangodb::velocypack::StringRef& result) {
+bool ConstantWeightShortestPathFinder::expandClosure(
+    Closure& sourceClosure, Snippets& sourceSnippets, Snippets& targetSnippets,
+    bool isBackward, std::deque<arangodb::velocypack::StringRef>& result) {
+  result.clear();  // TODO: is this ok, or should
+                   // assert that result is empty?
   _nextClosure.clear();
   for (auto& v : sourceClosure) {
     _edges.clear();
@@ -112,21 +118,33 @@ bool ConstantWeightShortestPathFinder::expandClosure(Closure& sourceClosure,
 
     for (size_t i = 0; i < neighborsSize; ++i) {
       auto const& n = _neighbors[i];
+
       if (sourceSnippets.find(n) == sourceSnippets.end()) {
         // NOTE: _edges[i] stays intact after move
         // and is reset to a nullptr. So if we crash
         // here no mem-leaks. or undefined behavior
         // Just make sure _edges is not used after
         sourceSnippets.emplace(n, new PathSnippet(v, std::move(_edges[i])));
+
+        // If the expanded node is in the intersection of source
+        // and target. Here we should not stop, but return all vertices
+        // in the intersection
         auto targetFoundIt = targetSnippets.find(n);
         if (targetFoundIt != targetSnippets.end()) {
-          result = n;
-          return true;
+          result.push_back(n);
+          if (result.size() >= options().getMaxPaths()) {
+            return true;
+          }
         }
         _nextClosure.emplace_back(n);
       }
     }
   }
+
+  if (result.size() > 0) {
+    return true;
+  }
+
   _edges.clear();
   _neighbors.clear();
   sourceClosure.swap(_nextClosure);
@@ -134,6 +152,8 @@ bool ConstantWeightShortestPathFinder::expandClosure(Closure& sourceClosure,
   return false;
 }
 
+// Fills in the path from the vertex n "backwards" towards start and
+// forwards towads end, into result
 void ConstantWeightShortestPathFinder::fillResult(arangodb::velocypack::StringRef& n,
                                                   arangodb::graph::ShortestPathResult& result) {
   result._vertices.emplace_back(n);

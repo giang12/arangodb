@@ -42,9 +42,10 @@ struct ShortestPathOptions;
 
 class ConstantWeightShortestPathFinder : public ShortestPathFinder {
  private:
+  //
   struct PathSnippet {
-    arangodb::velocypack::StringRef const _pred;
-    graph::EdgeDocumentToken _path;
+    arangodb::velocypack::StringRef const _pred; // _pred is the predecessor on the path
+    graph::EdgeDocumentToken _path;              // reference to the *edge* (?)
 
     PathSnippet(arangodb::velocypack::StringRef& pred, graph::EdgeDocumentToken&& path);
   };
@@ -68,9 +69,11 @@ class ConstantWeightShortestPathFinder : public ShortestPathFinder {
   void clearVisited();
 
   bool expandClosure(Closure& sourceClosure, Snippets& sourceSnippets,
-                     Snippets& targetSnippets, bool direction, arangodb::velocypack::StringRef& result);
+                     Snippets& targetSnippets, bool direction,
+                     std::deque<arangodb::velocypack::StringRef>& result);
 
-  void fillResult(arangodb::velocypack::StringRef& n, arangodb::graph::ShortestPathResult& result);
+  void fillResult(arangodb::velocypack::StringRef& n,
+                  arangodb::graph::ShortestPathResult& result);
 
  private:
   Snippets _leftFound;
