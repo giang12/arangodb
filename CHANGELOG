@@ -1,6 +1,14 @@
 devel
 -----
 
+* added "--log.ids" option to arangod
+
+  The default value for this option is `false`. Setting the option to `true`
+  will embed unique ids into all log messages generated in arangod code. This
+  allows for easy access to the location in the source code from which the
+  message originates. This should help support and development in identifying
+  problems.
+
 * added "name" property for indices
 
   If a name is not specified on index creation, one will be auto-generated.
